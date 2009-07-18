@@ -21,7 +21,7 @@
 ;; Boston, MA 02110-1301, USA.
 
 ;;; Code:
-(global-set-key "\C-c\C-p" 'poj-mode)
+(global-set-key "\C-c\C-g" 'poj-mode)
 
 ;;
 ;; mode line
@@ -59,6 +59,7 @@
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-ct" 'poj-get-timeline)
     (define-key map "\C-cu" 'poj-get-timeline-ask)
+    (define-key map "\C-cs" 'poj-submit-current)
     map))
 
 (defvar poj-mode nil)
@@ -108,12 +109,35 @@
   :type 'file
   :group 'poj)
 
+(defun poj-url-encode-string (str &optional coding)
+  "w3m-url-encode-string からコピー"
+  (apply (function concat)
+         (mapcar
+          (lambda (ch)
+            (cond
+             ((eq ch ?\n)
+              "%0D%0A")
+             ((string-match "[-a-zA-Z0-9_:/.]" (char-to-string ch)) ; xxx?
+              (char-to-string ch)) ; printable
+             ((char-equal ch ?\x20) ; space
+              "+")
+             (t
+              (format "%%%02x" ch)))) ; escape
+          ;; Coerce a string to a list of chars.
+          (append (encode-coding-string (or str "")
+                                        (or coding
+                                            buffer-file-coding-system
+                                            'iso-2022-7bit))
+                  nil))))
+
+
 (defun poj-submit-post-request (pid lid)
   (let*
-      ((post-data
-       (concat "problem_id=" pid
-               "&language=" lid
-               "&source=" (buffer-string))))
+      ((body (poj-url-encode-string (buffer-string) buffer-file-coding-system))
+       (post-data
+        (concat "problem_id=" pid
+                "&language=" lid
+                "&source=" body)))
     (with-temp-file poj-tmpfile
       (insert post-data))
     (call-process poj-curl-command nil nil nil
@@ -132,10 +156,11 @@
     (message "submitting...")
     (poj-submit-post-request problemid languagetype))
   (message "submitted...")
-  (poj-logout))
+  (poj-logout)
+  )
 
-;(defun poj-rregex (pttr str)
-;  (goto-char (point-min)) (while (replace-regexp pttr str)))
+(defun poj-rregex (pttr str)
+  (goto-char (point-min)) (while (replace-regexp pttr str)))
 
 (defun poj-get-timeline ()
   (interactive)
@@ -180,22 +205,22 @@
                       (insert-file-contents poj-tmpfile)
                       (if (string-match "<tr align=center>\\(\n\\|.\\)+</table>" (buffer-string))
                           (match-string 0 (buffer-string)) nil)))
-            (goto-char (point-min)) (while (replace-regexp "<tr align=center><td>\\([^<]*\\)</td><td><a href=userstatus[^>]*>\\([^<]*\\)</a></td>" "\\1\t\\2\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td><a href=problem[^>]*>\\([^<]*\\)</a></td>" "\\1\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Compiling</font>\\(</a>\\)?</td>" "--\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Running & Judging</font>\\(</a>\\)?</td>" "--\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Accepted</font>\\(</a>\\)?</td>" "AC\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Presentation Error</font>\\(</a>\\)?</td>" "PR\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Time Limit Exceeded</font>\\(</a>\\)?</td>" "TLE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Memory Limit Exceeded</font>\\(</a>\\)?</td>" "MLE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Wrong Answer</font>\\(</a>\\)?</td>" "WA\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Runtime Error</font>\\(</a>\\)?</td>" "RE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Output Limit Exceeded</font>\\(</a>\\)?</td>" "OLE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Compile Error</font>\\(</a>\\)?</td>" "CE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>System Error</font>\\(</a>\\)?</td>" "SE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Validator Error</font>\\(</a>\\)?</td>" "VE\t"))
-            (goto-char (point-min)) (while (replace-regexp "<td>\\([^<]*\\)</td>" "\\1\t"))
-            (goto-char (point-min)) (while (replace-regexp "\t</tr>" ""))
+            (poj-rregex "<tr align=center><td>\\([^<]*\\)</td><td><a href=userstatus[^>]*>\\([^<]*\\)</a></td>" "\\1\t\\2\t")
+            (poj-rregex "<td><a href=problem[^>]*>\\([^<]*\\)</a></td>" "\\1\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Compiling</font>\\(</a>\\)?</td>" "--\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Running & Judging</font>\\(</a>\\)?</td>" "--\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Accepted</font>\\(</a>\\)?</td>" "AC\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Presentation Error</font>\\(</a>\\)?</td>" "PR\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Time Limit Exceeded</font>\\(</a>\\)?</td>" "TLE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Memory Limit Exceeded</font>\\(</a>\\)?</td>" "MLE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Wrong Answer</font>\\(</a>\\)?</td>" "WA\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Runtime Error</font>\\(</a>\\)?</td>" "RE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Output Limit Exceeded</font>\\(</a>\\)?</td>" "OLE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Compile Error</font>\\(</a>\\)?</td>" "CE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>System Error</font>\\(</a>\\)?</td>" "SE\t")
+            (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Validator Error</font>\\(</a>\\)?</td>" "VE\t")
+            (poj-rregex "<td>\\([^<]*\\)</td>" "\\1\t")
+            (poj-rregex "\t</tr>" "")
             (goto-char (point-min)) (while (replace-string "</table>" ""))
             (buffer-string)
             ))
