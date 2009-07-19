@@ -1,8 +1,8 @@
-;;; poj-minor-mode.el --- minor mode of peking university online judge
+;;; poj-mode.el --- minor mode of peking university online judge
 
-;; Copyright (C) 2009 smly
+;; Copyright (C) 2009 Kohei Ozaki
 
-;; Author: smly <eowner@gmail.com>
+;; Author: Kohei Ozaki <eowner@gmail.com>
 ;; Keywords: tools
 
 ;; This file is free software; you can redistribute it and/or modify
@@ -33,7 +33,7 @@
 ;;
 ;; mode func
 (defun poj-mode (&optional arg)
-  "poj minor-mode"
+  "poj mode"
   (interactive)
   ;; mode variable settings
   (cond
@@ -45,6 +45,8 @@
     (setq poj-mode (not poj-mode))))
   ;; content
   (if poj-mode
+      (unless (file-exists-p poj-directory)
+        (make-directory poj-directory t))
       (progn
         (setq minor-mode-map-alist
               (cons (cons 'poj-mode poj-mode-map)
@@ -110,7 +112,7 @@
   :group 'poj)
 
 (defun poj-url-encode-string (str &optional coding)
-  "w3m-url-encode-string からコピー"
+  "copy from w3m-url-encode-string"
   (apply (function concat)
          (mapcar
           (lambda (ch)
@@ -229,7 +231,6 @@
   (message "finished"))
 
 (defun poj-login ()
-  (interactive)
   (message (concat "logging in to \"" poj-url "\" as \"" poj-usrid "\""))
   (let (pass str)
     (setq pass (read-passwd "password ? : "))
@@ -239,11 +240,9 @@
                   "-d" (concat "user_id1=" poj-usrid)
                   "-d" (concat "password1=" pass)
                   "-d" "url=/JudgeOnline/"
-                  (concat poj-url "/login")))
-    (message "say HAPPY! to POJ"))
+                  (concat poj-url "/login"))))
 
 (defun poj-logout ()
-  (interactive)
   (call-process poj-curl-command nil nil nil
                 "-b" poj-cookie
                 "-x" poj-proxy
@@ -252,4 +251,4 @@
 
 ;; mode provider
 (provide 'poj-mode)
-;;; poj-minor-mode.el ends here
+;;; poj-mode.el ends here
