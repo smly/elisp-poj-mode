@@ -23,40 +23,8 @@
 ;;; Code:
 (global-set-key "\C-c\C-g" 'poj-mode)
 
-;;
-;; mode line
-(if (not (assq 'poj-mode minor-mode-alist))
-    (setq minor-mode-alist
-          (cons '(poj-mode " POJ")
-                minor-mode-alist)))
+(defvar poj-mode nil)
 
-;;
-;; mode func
-(defun poj-mode (&optional arg)
-  "poj mode"
-  (interactive)
-  ;; mode variable settings
-  (cond
-   ((< (prefix-numeric-value arg) 0)
-    (setq poj-mode nil))
-   (arg
-    (setq poj-mode t))
-   (t
-    (setq poj-mode (not poj-mode))))
-  ;; content
-  (if poj-mode
-      (unless (file-exists-p poj-directory)
-        (make-directory poj-directory t))
-      (progn
-        (setq minor-mode-map-alist
-              (cons (cons 'poj-mode poj-mode-map)
-                    minor-mode-map-alist))
-        )
-    nil)
-  (recenter)
-  )
-
-;;
 (defvar poj-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-ct" 'poj-get-timeline)
@@ -64,10 +32,6 @@
     (define-key map "\C-cs" 'poj-submit-current)
     map))
 
-(defvar poj-mode nil)
-
-;;
-;; other func
 (defconst poj-mode-version
   "0.1" "Version number of poj-mode.el")
 
@@ -110,6 +74,41 @@
   "cookie name"
   :type 'file
   :group 'poj)
+
+;;
+;; mode line
+(if (not (assq 'poj-mode minor-mode-alist))
+    (setq minor-mode-alist
+          (cons '(poj-mode " POJ")
+                minor-mode-alist)))
+
+;;
+;; mode func
+(defun poj-mode (&optional arg)
+  "poj mode"
+  (interactive)
+  ;; mode variable settings
+  (cond
+   ((< (prefix-numeric-value arg) 0)
+    (setq poj-mode nil))
+   (arg
+    (setq poj-mode t))
+   (t
+    (setq poj-mode (not poj-mode))))
+  ;; content
+  (if poj-mode
+      (progn
+        (unless (file-exists-p poj-directory)
+          (make-directory poj-directory t))
+        (setq minor-mode-map-alist
+              (cons (cons 'poj-mode poj-mode-map)
+                    minor-mode-map-alist))
+        )
+    nil)
+  (recenter)
+  )
+;;
+;; other func
 
 (defun poj-url-encode-string (str &optional coding)
   "copy from w3m-url-encode-string"
@@ -162,7 +161,9 @@
   )
 
 (defun poj-rregex (pttr str)
-  (goto-char (point-min)) (while (replace-regexp pttr str)))
+  (goto-char (point-min))
+  (while (re-search-forward pttr nil t)
+    (replace-match str)))
 
 (defun poj-get-timeline ()
   (interactive)
@@ -223,7 +224,8 @@
             (poj-rregex "<td>\\(<a[^>]*>\\)?<font color=[^>]*>Validator Error</font>\\(</a>\\)?</td>" "VE\t")
             (poj-rregex "<td>\\([^<]*\\)</td>" "\\1\t")
             (poj-rregex "\t</tr>" "")
-            (goto-char (point-min)) (while (replace-string "</table>" ""))
+            (while (search-forward "</table>" nil t)
+              (replace-match ""))
             (buffer-string)
             ))
   (goto-char (point-min))
